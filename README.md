@@ -6,119 +6,183 @@
 
 ## What is this?
 
-SoulChain anchors your Hermes Agent's identity and memory onto the Base blockchain. Every anchored file (SOUL.md, MEMORY.md, USER.md) gets a tamper-proof cryptographic record on-chain. You can verify nothing was silently altered, and restore from any point in history.
+SoulChain anchors your Hermes Agent's identity and memory onto the Base blockchain. Every tracked file (SOUL.md, MEMORY.md, USER.md) gets a tamper-proof cryptographic record on-chain. You can verify nothing was silently altered, and restore from any point in history.
 
 When a VPS dies, a disk corrupts, or a provider shuts down — the agent's soul survives.
 
-## Status: Phase 1 (POC) — ✅ PROVEN
-
-The end-to-end loop works:
-
-```
-[SOUL.md] → SHA-256 → EIP-191 sign → SoulRegistry.writeDocument() → Base L2 → verify
-```
+## Status: Phase 2 — ✅ THREE SYNC MODES
 
 | Component | Status |
 |---|---|
-| SoulRegistry.sol | ✅ Deployed on Base mainnet |
-| registerSoul() | ✅ Called, soul registered |
-| writeDocument() | ✅ Anchored SOUL.md on-chain |
-| verifyDocument() | ✅ Local hash matches on-chain hash |
-| Python anchor script | ✅ Working |
+| SoulRegistry.sol on Base | ✅ Deployed & registered |
+| `on-write` daemon | ✅ Watchdog file watcher — anchors within 2s of change |
+| `interval` daemon | ✅ Periodic batch sync — configurable interval |
+| `manual` CLI | ✅ On-demand anchor, status, verify |
+| Unified CLI | ✅ `soulchain anchor`, `soulchain start`, `soulchain config` |
+| Systemd services | ✅ Both on-write and interval service files |
+| Smart skip | ✅ Only anchors files that actually changed |
 
-## Deployment
+### Proven test results
 
-**Contract:** `0x2AE3F15CAD486226Af839ae8FB4BbA08428283A2` (Base mainnet)
-**Deployer:** `0x8741b8a825644D9Ef18Faf2DAB5e9b47B900F2b6`
-**Deploy Tx:** `0x6f6c2efdf03d689c308822d2cced41e2fb84a20d209193546294394819c1550e`
-**Register Tx:** `0x46a68db03f08b344227957fb08fb83300eefaf2f9a1f833c5ba239b84d04ffe6`
-**First Anchor:** `0x2d105eaffd390bb88d8636a5552cb2a2f570b755ad9dcaea7c114abb53c28bc1`
+All three modes verified with real on-chain transactions on Base mainnet:
+
+| Mode | Test | Result |
+|---|---|---|
+| `on-write` | Appended to MEMORY.md → auto-anchored in ~7s | ✅ v0→v1 |
+| `interval` | Appended to USER.md → picked up in 10s cycle | ✅ v0→v1 |
+| `manual` | `soulchain anchor` → skips unchanged, anchors diffs | ✅ Working |
 
 ## Quick Start
 
 ```bash
-# Set up Python venv
+# Install
+git clone https://github.com/babylonagent/soulchain-hermes.git
+cd soulchain-hermes
 python3.11 -m venv .venv
-pip install web3 eth-account py-solc-x
+pip install -e .
 
-# Deploy (if needed)
-python scripts/deploy.py --chain base --private-key $PRIVATE_KEY
-
-# Anchor all tracked files
+# Configure private key
 export SOULCHAIN_PRIVATE_KEY=0x...
-python scripts/anchor.py
 
-# Check on-chain status
-python scripts/anchor.py --status
+# Manual mode — anchor on demand
+soulchain anchor                  # anchor changed files
+soulchain anchor --status         # show on-chain status
+soulchain anchor --verify         # verify local vs on-chain
 
-# Verify local files match on-chain hashes
-python scripts/anchor.py --verify
+# Daemon mode — continuous sync
+soulchain start --mode on-write   # file watcher (anchors within 2s)
+soulchain start --mode interval   # periodic (every 5 min by default)
 ```
 
-## Tracked Files
+## Sync Modes
 
-| File | Doc Type | Description |
-|---|---|---|
-| `~/.hermes/SOUL.md` | 0 (SOUL) | Agent identity / personality |
-| `~/.hermes/memories/MEMORY.md` | 1 (MEMORY) | Agent persistent memory |
-| `~/.hermes/memories/USER.md` | 3 (USER) | User profile |
-| `~/.hermes/config.yaml` | 10 (IDENTITY) | Agent configuration |
+### `on-write` — Real-time file watcher
+Uses `watchdog` to monitor tracked files. When a file changes:
+1. Debounces for 2 seconds (waits for writes to settle)
+2. SHA-256 hashes the new content
+3. Signs with EIP-191
+4. Anchors on Base via `writeDocument()`
+
+**Best for:** Always-on agents that need every memory change immortalized.
+
+### `interval` — Periodic batch sync
+Checks all tracked files every N seconds. Anchors any that changed since last cycle.
+
+**Best for:** Lightweight setups, cron-like operation, lower gas usage.
+
+### `manual` — On-demand
+No daemon. Run when you want to anchor.
+
+```bash
+soulchain anchor              # anchor changed files
+soulchain anchor --force      # re-anchor everything
+soulchain anchor --file ~/.hermes/SOUL.md
+soulchain anchor --status     # on-chain status
+soulchain anchor --verify     # verify integrity
+soulchain anchor --json       # machine-readable output
+```
+
+**Best for:** Scripts, CI/CD hooks, manual checkpoints.
+
+## Configuration
+
+`soulchain.config.json`:
+```json
+{
+  "chain": {
+    "rpcUrl": "https://mainnet.base.org",
+    "chainId": 8453,
+    "contractAddress": "0x2AE3F15CAD486226Af839ae8FB4BbA08428283A2"
+  },
+  "trackedFiles": {
+    "SOUL":     { "docType": 0,  "path": "~/.hermes/SOUL.md" },
+    "MEMORY":   { "docType": 1,  "path": "~/.hermes/memories/MEMORY.md" },
+    "USER":     { "docType": 3,  "path": "~/.hermes/memories/USER.md" },
+    "IDENTITY": { "docType": 10, "path": "~/.hermes/config.yaml" }
+  },
+  "syncMode": "on-write",
+  "syncIntervalSec": 300,
+  "debounceMs": 2000
+}
+```
 
 ## Architecture
 
 ```
-Hermes Agent memory/skills files
-         │
-         ▼
-  ┌──────────────┐
-  │  anchor.py   │  ← hashes files with SHA-256
-  │              │  ← signs with EIP-191 (deployer wallet)
-  └──────┬───────┘
-         │
-         ▼
-  ┌──────────────────────────────────────────┐
-  │  SoulRegistry.sol on Base L2 (~$0.001)   │
-  │  - registerSoul() — one-time identity    │
-  │  - writeDocument() — anchor file version │
-  │  - verifyDocument() — public tamper-check│
-  │  - grantAccess() / revokeAccess()        │
-  │  - registerChild() — multi-agent tree    │
-  └──────────────────────────────────────────┘
+ ┌──────────────────────────────────────────────────────────┐
+ │                    soulchain.core                         │
+ │  SoulChainEngine — hash, sign, anchor, verify, status     │
+ │  (shared by all three modes)                              │
+ └──────────────────────────────────────────────────────────┘
+         ▲              ▲              ▲
+         │              │              │
+ ┌──────────────┐ ┌────────────┐ ┌──────────────┐
+ │  on_write    │ │  interval  │ │   manual     │
+ │  watchdog    │ │  timer     │ │   CLI        │
+ │  daemon      │ │  daemon    │ │   one-shot   │
+ └──────────────┘ └────────────┘ └──────────────┘
+         │              │              │
+         ▼              ▼              ▼
+ ┌──────────────────────────────────────────────────────────┐
+ │              SoulRegistry.sol on Base L2                   │
+ │  registerSoul() · writeDocument() · verifyDocument()      │
+ └──────────────────────────────────────────────────────────┘
 ```
 
-## Roadmap
+## Systemd Deployment
 
-### Phase 1 — POC ✅
-- [x] Deploy SoulRegistry to Base
-- [x] Register soul
-- [x] Hash + sign + anchor files
-- [x] Verify on-chain
-- [x] Status command
+```bash
+sudo cp deploy/soulchain-on-write.service /etc/systemd/system/
+sudo systemctl edit soulchain-on-write
+# Add your private key:
+# [Service]
+# Environment=SOULCHAIN_PRIVATE_KEY=0x...
 
-### Phase 2 — Native Skill (next)
-- [ ] Hermes skill (SKILL.md) — auto-load on memory writes
-- [ ] Encryption layer (Ed25519 + AES-256) — encrypted blobs to IPFS/Arweave
-- [ ] Cron job — daily batch anchor
-- [ ] Proper keystore (not raw private key in env)
-- [ ] Funded dedicated signer wallet
+sudo systemctl daemon-reload
+sudo systemctl enable --now soulchain-on-write
+sudo journalctl -u soulchain-on-write -f
+```
 
-### Phase 3 — Advanced
-- [ ] Access grants — let other agents/people verify your identity
-- [ ] Multi-agent hierarchy — parent/child agent relationships on-chain
-- [ ] Public anchoring dashboard
-- [ ] File restore from on-chain history
+See [`deploy/README.md`](deploy/README.md) for interval mode setup.
+
+## Deployment
+
+**Contract:** `0x2AE3F15CAD486226Af839ae8FB4BbA08428283A2` (Base mainnet)
+**Deploy Tx:** `0x6f6c2efdf03d689c308822d2cced41e2fb84a20d209193546294394819c1550e`
 
 ## Cost Analysis
 
 | Operation | Gas | Cost (Base L2) |
 |---|---|---|
-| Deploy SoulRegistry | ~1,534,635 | ~$0.000010 |
-| registerSoul() | ~50,000 | ~$0.0000003 |
-| writeDocument() | ~250,000 | ~$0.0000017 |
-| Daily anchor (4 files) | ~1,000,000 | ~$0.000007 |
-| **Monthly total** | ~30M | **~$0.0002** |
+| `registerSoul()` | ~50k | ~$0.0000003 |
+| `writeDocument()` | ~100k | ~$0.0000007 |
+| Daily (4 files, on-write) | ~400k | ~$0.000003 |
+| **Monthly** | ~12M | **~$0.00008** |
 
-Base L2 is absurdly cheap. Anchoring all tracked files daily costs fractions of a cent.
+Effectively free. Base L2 gas is ~0.005 gwei.
+
+## Roadmap
+
+### Phase 1 — POC ✅
+- [x] Deploy SoulRegistry to Base
+- [x] Hash + sign + anchor files
+- [x] Verify on-chain
+
+### Phase 2 — Sync Modes ✅
+- [x] `on-write` daemon (watchdog file watcher)
+- [x] `interval` daemon (periodic batch)
+- [x] `manual` CLI (on-demand)
+- [x] Unified CLI + config file
+- [x] Systemd service files
+- [x] Smart skip (only anchor changed files)
+
+### Phase 3 — Advanced (next)
+- [ ] Encryption layer (Ed25519 + AES-256)
+- [ ] IPFS/Arweave storage for encrypted blobs
+- [ ] Hermes skill (auto-load, status in agent context)
+- [ ] Access grants (let others verify your identity)
+- [ ] Multi-agent hierarchy (parent/child on-chain)
+- [ ] Public verification dashboard
 
 ## Credit
 
