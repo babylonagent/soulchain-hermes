@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SoulChain — Babylon Agent</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --border: #222;
+    --text: #e0e0e0;
+    --muted: #666;
+    --accent: #7C3AED;
+    --green: #00d97e;
+    --red: #ff4444;
+    --yellow: #ffd000;
+    --mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+  .container { max-width: 800px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 3rem; }
+  .logo { font-size: 2.5rem; margin-bottom: 0.5rem; }
+  .title { font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em; }
+  .subtitle { color: var(--muted); font-size: 0.95rem; margin-top: 0.3rem; }
+  .chain-badge {
+    display: inline-block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.8rem;
+    color: var(--accent);
+    margin-top: 0.8rem;
+    font-family: var(--mono);
+  }
+  .agent-info {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .agent-info .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .agent-info .row:last-child { border-bottom: none; }
+  .agent-info .label { color: var(--muted); font-size: 0.85rem; }
+  .agent-info .value { font-family: var(--mono); font-size: 0.85rem; }
+  .agent-info .value a { color: var(--accent); text-decoration: none; }
+  .docs-list { display: flex; flex-direction: column; gap: 1rem; }
+  .doc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: border-color 0.2s;
+  }
+  .doc-card.verified { border-left: 3px solid var(--green); }
+  .doc-card.mismatch { border-left: 3px solid var(--red); }
+  .doc-card.pending { border-left: 3px solid var(--yellow); }
+  .doc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  .doc-name { font-size: 1.1rem; font-weight: 600; }
+  .doc-version {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--muted);
+    background: var(--bg);
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+  }
+  .doc-hash {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--muted);
+    word-break: break-all;
+    margin: 0.5rem 0;
+  }
+  .doc-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 0.8rem;
+  }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .status-badge.verified { color: var(--green); }
+  .status-badge.mismatch { color: var(--red); }
+  .status-badge.pending { color: var(--yellow); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot.verified { background: var(--green); }
+  .dot.mismatch { background: var(--red); }
+  .dot.pending { background: var(--yellow); }
+  .loading { text-align: center; padding: 3rem; color: var(--muted); }
+  .footer {
+    text-align: center;
+    margin-top: 3rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .footer a { color: var(--accent); text-decoration: none; }
+  .refresh-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .refresh-btn:hover { border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="logo">🔗</div>
+    <div class="title">SoulChain</div>
+    <div class="subtitle">Identity that survives destruction — anchored on Base</div>
+    <div class="chain-badge">Base L2 · SoulRegistry</div>
+  </div>
+
+  <div class="agent-info">
+    <div class="row">
+      <span class="label">Agent</span>
+      <span class="value" id="agent-addr">Loading...</span>
+    </div>
+    <div class="row">
+      <span class="label">Contract</span>
+      <span class="value"><a href="#" id="contract-link" target="_blank">Loading...</a></span>
+    </div>
+    <div class="row">
+      <span class="label">Registered</span>
+      <span class="value" id="registered">Loading...</span>
+    </div>
+    <div class="row">
+      <span class="label">Total Anchors</span>
+      <span class="value" id="total-anchors">Loading...</span>
+    </div>
+  </div>
+
+  <div class="docs-list" id="docs-list">
+    <div class="loading">Reading from SoulRegistry on Base...</div>
+  </div>
+
+  <div class="footer">
+    <p>Built by <a href="https://github.com/babylonagent/soulchain-hermes">Babylon Agent</a> ·
+       Based on <a href="https://github.com/openClause/soulchain">openClause/soulchain</a> (MIT)</p>
+    <p style="margin-top: 0.5rem;">
+      <button class="refresh-btn" onclick="loadData()">Refresh</button>
+    </p>
+  </div>
+</div>
+
+<script src="ethers.umd.min.js"></script>
+<script>
+const CONTRACT_ADDR = "0x2AE3F15CAD486226Af839ae8FB4BbA08428283A2";
+const AGENT_ADDR = "0x8741b8a825644D9Ef18Faf2DAB5e9b47B900F2b6";
+const RPC_URL = "https://mainnet.base.org"; // Public — for production use Alchemy/Infura
+const EXPLORER = "https://basescan.org";
+
+const DOC_TYPES = [
+  { type: 0, name: "SOUL", desc: "Agent Identity" },
+  { type: 1, name: "MEMORY", desc: "Persistent Memory" },
+  { type: 3, name: "USER", desc: "User Profile" },
+  { type: 10, name: "IDENTITY", desc: "Configuration" },
+];
+
+const ABI = [
+  "function registered(address) view returns (bool)",
+  "function documentCount(address, uint8) view returns (uint32)",
+  "function latestDocument(address, uint8) view returns ((bytes32 contentHash, bytes32 encryptedHash, string storageCid, uint8 docType, uint64 timestamp, uint32 version, bytes32 prevHash, bytes signature))",
+  "function verifyDocument(address, uint8, uint32, bytes32) view returns (bool)",
+];
+
+async function loadData() {
+  try {
+    const provider = new ethers.JsonRpcProvider(RPC_URL);
+    const contract = new ethers.Contract(CONTRACT_ADDR, ABI, provider);
+
+    // Agent info
+    const isRegistered = await contract.registered(AGENT_ADDR);
+    document.getElementById("agent-addr").textContent =
+      AGENT_ADDR.slice(0, 10) + "..." + AGENT_ADDR.slice(-8);
+    document.getElementById("contract-link").textContent =
+      CONTRACT_ADDR.slice(0, 10) + "..." + CONTRACT_ADDR.slice(-8);
+    document.getElementById("contract-link").href = `${EXPLORER}/address/${CONTRACT_ADDR}`;
+    document.getElementById("registered").textContent = isRegistered ? "✅ Yes" : "❌ No";
+
+    let totalAnchors = 0;
+    let docsHtml = "";
+
+    for (const doc of DOC_TYPES) {
+      try {
+        const count = await contract.documentCount(AGENT_ADDR, doc.type);
+        totalAnchors += Number(count);
+
+        if (count > 0) {
+          const latest = await contract.latestDocument(AGENT_ADDR, doc.type);
+          const contentHash = latest.contentHash;
+          const timestamp = Number(latest.timestamp);
+          const version = Number(latest.version);
+          const encrypted = latest.encryptedHash !== latest.contentHash;
+          const date = new Date(timestamp * 1000).toISOString().slice(0, 19).replace("T", " ");
+
+          docsHtml += `
+            <div class="doc-card verified">
+              <div class="doc-header">
+                <div>
+                  <div class="doc-name">${doc.name}</div>
+                  <div style="color: var(--muted); font-size: 0.8rem;">${doc.desc}</div>
+                </div>
+                <span class="doc-version">v${version} · ${count} total</span>
+              </div>
+              <div class="doc-hash">sha256: ${contentHash.slice(0, 20)}...${contentHash.slice(-12)}</div>
+              <div class="doc-meta">
+                <span>📅 ${date} UTC</span>
+                <span>${encrypted ? "🔐 Encrypted" : "📋 Plaintext"}</span>
+                <span class="status-badge verified"><span class="dot verified"></span>On-Chain</span>
+              </div>
+            </div>
+          `;
+        } else {
+          docsHtml += `
+            <div class="doc-card pending">
+              <div class="doc-header">
+                <div>
+                  <div class="doc-name">${doc.name}</div>
+                  <div style="color: var(--muted); font-size: 0.8rem;">${doc.desc}</div>
+                </div>
+                <span class="status-badge pending"><span class="dot pending"></span>Not Anchored</span>
+              </div>
+            </div>
+          `;
+        }
+      } catch (e) {
+        docsHtml += `
+          <div class="doc-card pending">
+            <div class="doc-header">
+              <div class="doc-name">${doc.name}</div>
+              <span class="status-badge pending"><span class="dot pending"></span>Error</span>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    document.getElementById("total-anchors").textContent = totalAnchors;
+    document.getElementById("docs-list").innerHTML = docsHtml;
+
+  } catch (e) {
+    document.getElementById("docs-list").innerHTML =
+      `<div class="loading">❌ Failed to connect: ${e.message}</div>`;
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>

@@ -11,6 +11,7 @@ Or as a cron job:
     soulchain sync --mode interval
 """
 import logging
+import os
 import signal
 import time
 
@@ -30,7 +31,18 @@ def run_daemon():
     config = load_config()
     interval = config.get("syncIntervalSec", 300)
     private_key = load_private_key()
-    engine = SoulChainEngine(private_key, config=config)
+
+    # Load crypto provider if keystore exists
+    crypto = None
+    keystore_path = os.environ.get("SOULCHAIN_KEYSTORE", os.path.expanduser("~/.soulchain/keystore.json"))
+    if os.path.exists(keystore_path):
+        passphrase = os.environ.get("SOULCHAIN_KEYSTORE_PASSWORD")
+        if passphrase:
+            from ..crypto import SoulCryptoProvider
+            crypto = SoulCryptoProvider.from_keystore(keystore_path, passphrase)
+            logger.info(f"Crypto: enabled ({crypto.address})")
+
+    engine = SoulChainEngine(private_key, config=config, crypto=crypto)
 
     logger.info(f"SoulChain interval daemon starting")
     logger.info(f"Agent: {engine.address}")

@@ -120,7 +120,22 @@ def run_daemon():
 
     config = load_config()
     private_key = load_private_key()
-    engine = SoulChainEngine(private_key, config=config)
+
+    # Load crypto provider if keystore exists
+    crypto = None
+    keystore_path = os.environ.get("SOULCHAIN_KEYSTORE", os.path.expanduser("~/.soulchain/keystore.json"))
+    if os.path.exists(keystore_path):
+        passphrase = os.environ.get("SOULCHAIN_KEYSTORE_PASSWORD")
+        if passphrase:
+            from ..crypto import SoulCryptoProvider
+            crypto = SoulCryptoProvider.from_keystore(keystore_path, passphrase)
+            logger.info(f"Crypto: enabled ({crypto.address})")
+        else:
+            logger.warning(f"Keystore found at {keystore_path} but no SOULCHAIN_KEYSTORE_PASSWORD set")
+    else:
+        logger.info("Crypto: disabled (no keystore — plaintext anchoring only)")
+
+    engine = SoulChainEngine(private_key, config=config, crypto=crypto)
 
     logger.info(f"SoulChain on-write daemon starting")
     logger.info(f"Agent: {engine.address}")

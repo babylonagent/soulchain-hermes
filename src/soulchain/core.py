@@ -16,6 +16,10 @@ from web3 import Web3
 from eth_account import Account
 from eth_account.messages import encode_defunct
 
+# Crypto + storage (Phase 3)
+from .crypto import SoulCryptoProvider, SoulKeypair, EncryptedData, derive_document_key
+from .storage import StorageAdapter, LocalStorage, create_storage
+
 logger = logging.getLogger("soulchain")
 
 # ─── Constants ────────────────────────────────────────────────────────────────
@@ -97,9 +101,16 @@ SOUL_REGISTRY_ABI = [
 class SoulChainEngine:
     """Core anchoring engine. Mode-agnostic — handles hashing, signing, tx."""
 
-    def __init__(self, private_key: str, rpc_url: str = None, config: dict = None):
+    def __init__(self, private_key: str, rpc_url: str = None, config: dict = None,
+                 crypto: SoulCryptoProvider = None, storage: StorageAdapter = None):
         self.account = Account.from_key(private_key)
         self.config = config or DEFAULT_CONFIG
+
+        # Crypto provider (optional — enables encryption + Ed25519 signatures)
+        self.crypto = crypto
+
+        # Storage adapter (optional — stores encrypted blobs off-chain)
+        self.storage = storage or create_storage(self.config)
 
         # Resolve RPC URL
         if rpc_url:
@@ -203,26 +214,50 @@ class SoulChainEngine:
     def anchor_file(self, filepath: str, doc_type: int, force: bool = False) -> Optional[str]:
         """
         Hash, sign, and anchor a file on-chain.
+        If crypto provider is set: encrypts content, uploads to storage, anchors both hashes.
         Returns tx hash if anchored, None if skipped/failed.
         """
-        content_hash = self.hash_file(filepath)
-        if content_hash is None:
+        path = Path(filepath).expanduser()
+        if not path.exists():
             logger.warning(f"File not found: {filepath}")
             return None
+
+        content = path.read_bytes()
+        content_hash = "0x" + hashlib.sha256(content).hexdigest()
 
         # Skip if unchanged (unless forced)
         if not force and self._last_hashes.get(doc_type) == content_hash:
             logger.debug(f"Skip {filepath}: unchanged")
             return None
 
-        # Sign
-        msg = encode_defunct(hexstr=content_hash)
-        signed_msg = self.account.sign_message(msg)
-        signature = signed_msg.signature
+        # Determine version for key derivation
+        doc_type_name = DOC_TYPE_NAMES.get(doc_type, f"type_{doc_type}").lower()
+        try:
+            count = self.contract.functions.documentCount(
+                self.account.address, doc_type
+            ).call()
+            version = count
+        except Exception:
+            version = 0
 
-        # Build tx
-        encrypted_hash = content_hash  # Phase 2: same as content hash (no encryption yet)
-        storage_cid = f"local:{filepath}"
+        # Encrypt + upload if crypto provider is available
+        if self.crypto:
+            enc_data = self.crypto.encrypt_document(content, doc_type_name, version)
+            enc_blob = enc_data.to_blob()
+            encrypted_hash = "0x" + hashlib.sha256(enc_blob).hexdigest()
+
+            # Upload encrypted blob to storage
+            storage_cid = self.storage.upload(enc_blob, f"{doc_type_name}_v{version}.enc")
+            logger.info(f"🔐 Encrypted {doc_type_name}: {len(content)}B → {len(enc_blob)}B, stored: {storage_cid[:40]}")
+
+            # Sign with Ed25519 (crypto provider)
+            signature = self.crypto.sign_hash(content_hash)
+        else:
+            # Phase 2 fallback: no encryption, EIP-191 signature
+            encrypted_hash = content_hash
+            storage_cid = f"local:{filepath}"
+            msg = encode_defunct(hexstr=content_hash)
+            signature = self.account.sign_message(msg).signature
 
         try:
             gas_estimate = self.contract.functions.writeDocument(
@@ -353,6 +388,53 @@ class SoulChainEngine:
             except Exception:
                 results.append({"name": name, "verified": False, "reason": "no_onchain_version"})
         return results
+
+    def restore_file(self, doc_type: int, version: int = None) -> Optional[bytes]:
+        """
+        Restore a file's content from on-chain + storage.
+        Downloads encrypted blob from storage, decrypts with crypto provider.
+        """
+        if not self.crypto:
+            logger.error("Cannot restore: no crypto provider configured")
+            return None
+
+        try:
+            if version is None:
+                doc = self.contract.functions.latestDocument(
+                    self.account.address, doc_type
+                ).call()
+            else:
+                doc = self.contract.functions.documentAt(
+                    self.account.address, doc_type, version
+                ).call()
+
+            content_hash = "0x" + doc[0].hex()
+            cid = doc[2]
+            actual_version = doc[5]
+
+            if not cid or cid == "":
+                logger.error(f"No storage CID for doc type {doc_type} v{actual_version}")
+                return None
+
+            logger.info(f"Downloading {cid[:40]}...")
+            enc_blob = self.storage.download(cid)
+
+            doc_type_name = DOC_TYPE_NAMES.get(doc_type, f"type_{doc_type}").lower()
+            enc_data = EncryptedData.from_blob(enc_blob)
+            plaintext = self.crypto.decrypt_document(enc_data, doc_type_name, actual_version)
+
+            # Verify restored hash matches on-chain
+            restored_hash = "0x" + hashlib.sha256(plaintext).hexdigest()
+            if restored_hash != content_hash:
+                logger.error("Hash mismatch! Restored content doesn't match on-chain record")
+                return None
+
+            logger.info(f"✅ Restored {doc_type_name} v{actual_version}: {len(plaintext)}B")
+            return plaintext
+
+        except Exception as e:
+            logger.error(f"Restore failed: {e}")
+            return None
 
 
 def load_config(config_path: str = None) -> dict:
