@@ -1,0 +1,15 @@
+# Private keys, keystores, env files
+*.env
+*.pem
+.venv/
+__pycache__/
+*.pyc
+.turbo/
+
+# Secret files
+secrets/
+*.secret
+keys/
+
+# Keep the contract artifacts (needed for deployment)
+!contracts/artifacts/
