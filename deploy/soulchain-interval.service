@@ -1,13 +1,16 @@
 [Unit]
-Description=SoulChain for Hermes Agent — Interval Daemon
+Description=SoulChain — Interval Daemon (Encrypted)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/root/soulchain-hermes/.venv/bin/soulchain start --mode interval
-WorkingDirectory=/root/soulchain-hermes
-Environment=SOULCHAIN_CONFIG=/root/soulchain-hermes/soulchain.config.json
+# Update this path for your installation
+ExecStart=/usr/local/bin/soulchain start --mode interval
+WorkingDirectory=%h/.soulchain
+Environment=SOULCHAIN_CONFIG=%h/.soulchain/soulchain.config.json
+Environment=SOULCHAIN_PRIVATE_KEY=${SOULCHAIN_PRIVATE_KEY}
+Environment=SOULCHAIN_KEYSTORE=%h/.soulchain/keystore.json
 Restart=always
 RestartSec=10
 StandardOutput=journal
