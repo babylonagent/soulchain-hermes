@@ -1,0 +1,18 @@
+[Unit]
+Description=SoulChain for Hermes Agent — Interval Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/root/soulchain-hermes/.venv/bin/soulchain start --mode interval
+WorkingDirectory=/root/soulchain-hermes
+Environment=SOULCHAIN_CONFIG=/root/soulchain-hermes/soulchain.config.json
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=soulchain
+
+[Install]
+WantedBy=multi-user.target

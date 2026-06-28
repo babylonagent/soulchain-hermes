@@ -1,0 +1,26 @@
+[project]
+name = "soulchain-hermes"
+version = "0.2.0"
+description = "SoulChain for Hermes Agent — Sovereign AI memory, anchored on Base"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "web3>=7.0",
+    "eth-account>=0.11",
+    "watchdog>=3.0",
+    "py-solc-x>=2.0",
+]
+
+[project.scripts]
+soulchain = "soulchain.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+soulchain = ["../../contracts/artifacts/*.json"]

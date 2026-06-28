@@ -6,10 +6,18 @@ __pycache__/
 *.pyc
 .turbo/
 
+# Build artifacts
+*.egg-info/
+build/
+dist/
+
 # Secret files
 secrets/
 *.secret
 keys/
+
+# Test configs
+test-*.config.json
 
 # Keep the contract artifacts (needed for deployment)
 !contracts/artifacts/
