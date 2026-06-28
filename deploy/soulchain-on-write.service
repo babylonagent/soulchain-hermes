@@ -1,16 +1,19 @@
 [Unit]
-Description=SoulChain for Hermes Agent — On-Write Daemon (Encrypted)
+Description=SoulChain — On-Write Daemon (Encrypted)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/root/soulchain-hermes/.venv/bin/soulchain start --mode on-write
-WorkingDirectory=/root/soulchain-hermes
-Environment=SOULCHAIN_CONFIG=/root/soulchain-hermes/soulchain.config.json
-Environment=SOULCHAIN_PRIVATE_KEY_FILE=/root/.chancy/secrets/sandbox-wallet.env
-Environment=SOULCHAIN_KEYSTORE=/root/.soulchain/keystore.json
-Environment=SOULCHAIN_KEYSTORE_PASSWORD=babylon_soul_passphrase
+# Update these paths for your installation
+ExecStart=/usr/local/bin/soulchain start --mode on-write
+WorkingDirectory=%h/.soulchain
+Environment=SOULCHAIN_CONFIG=%h/.soulchain/soulchain.config.json
+# Provide your private key via an env file or environment variable:
+Environment=SOULCHAIN_PRIVATE_KEY=${SOULCHAIN_PRIVATE_KEY}
+# Optional: encrypted keystore for Ed25519 crypto
+Environment=SOULCHAIN_KEYSTORE=%h/.soulchain/keystore.json
+# Set SOULCHAIN_KEYSTORE_PASSWORD in your environment or systemd override
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -19,7 +22,6 @@ SyslogIdentifier=soulchain
 
 # Security hardening
 NoNewPrivileges=true
-ReadWritePaths=/root/.hermes /root/soulchain-hermes /root/.soulchain
 
 [Install]
 WantedBy=multi-user.target
