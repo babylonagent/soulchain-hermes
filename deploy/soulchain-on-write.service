@@ -1,5 +1,5 @@
 [Unit]
-Description=SoulChain for Hermes Agent — On-Write Daemon
+Description=SoulChain for Hermes Agent — On-Write Daemon (Encrypted)
 After=network-online.target
 Wants=network-online.target
 
@@ -7,8 +7,10 @@ Wants=network-online.target
 Type=simple
 ExecStart=/root/soulchain-hermes/.venv/bin/soulchain start --mode on-write
 WorkingDirectory=/root/soulchain-hermes
-Environment=SOULCHAIN_PRIVATE_KEY_FILE=/root/.chancy/secrets/sandbox-wallet.env
 Environment=SOULCHAIN_CONFIG=/root/soulchain-hermes/soulchain.config.json
+Environment=SOULCHAIN_PRIVATE_KEY_FILE=/root/.chancy/secrets/sandbox-wallet.env
+Environment=SOULCHAIN_KEYSTORE=/root/.soulchain/keystore.json
+Environment=SOULCHAIN_KEYSTORE_PASSWORD=babylon_soul_passphrase
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -17,9 +19,7 @@ SyslogIdentifier=soulchain
 
 # Security hardening
 NoNewPrivileges=true
-ProtectSystem=strict
-ReadWritePaths=/root/.hermes /root/soulchain-hermes
-ProtectHome=read-only
+ReadWritePaths=/root/.hermes /root/soulchain-hermes /root/.soulchain
 
 [Install]
 WantedBy=multi-user.target
