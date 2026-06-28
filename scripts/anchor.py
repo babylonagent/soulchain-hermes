@@ -24,9 +24,15 @@ from eth_account import Account
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 CONTRACT_ADDRESS = "0x2AE3F15CAD486226Af839ae8FB4BbA08428283A2"
-CHAIN_RPC = "https://mainnet.base.org"
 CHAIN_ID = 8453
 EXPLORER = "https://basescan.org"
+
+# Use Alchemy RPC if available (avoids 429 rate limits on public endpoint)
+ALCHEMY_KEY = os.environ.get("BASE_ALCHEMY_KEY", "")
+if ALCHEMY_KEY:
+    CHAIN_RPC = f"https://base-mainnet.g.alchemy.com/v2/{ALCHEMY_KEY}"
+else:
+    CHAIN_RPC = "https://mainnet.base.org"
 
 # Hermes file paths → SoulRegistry docType mapping
 # Doc types from SoulRegistry.sol: SOUL=0, MEMORY=1, AGENTS=2, USER=3, DAILY=4,
