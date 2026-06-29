@@ -14,9 +14,28 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import sys
+from pathlib import Path
 
-from .core import load_config, load_private_key, DEFAULT_CONFIG
+from .core import load_config, load_private_key, DEFAULT_CONFIG, EXPLORER
+
+
+def _load_engine():
+    """Create a SoulChainEngine with crypto provider if keystore is available."""
+    from .core import SoulChainEngine
+    config = load_config()
+    private_key = load_private_key()
+
+    crypto = None
+    keystore_path = os.environ.get("SOULCHAIN_KEYSTORE", os.path.expanduser("~/.soulchain/keystore.json"))
+    if os.path.exists(keystore_path):
+        passphrase = os.environ.get("SOULCHAIN_KEYSTORE_PASSWORD")
+        if passphrase:
+            from .crypto import SoulCryptoProvider
+            crypto = SoulCryptoProvider.from_keystore(keystore_path, passphrase)
+
+    return SoulChainEngine(private_key, config=config, crypto=crypto)
 
 
 def main():
@@ -45,6 +64,26 @@ def main():
 
     # register — register soul
     reg_parser = subparsers.add_parser("register", help="Register soul (one-time)")
+
+    # grant — grant access to another address
+    grant_parser = subparsers.add_parser("grant", help="Grant read access to another address")
+    grant_parser.add_argument("reader", type=str, help="Address to grant access to")
+    grant_parser.add_argument("--doc-type", type=int, required=True, help="Doc type (0=SOUL, 1=MEMORY, 3=USER, 10=IDENTITY)")
+
+    # revoke — revoke access
+    revoke_parser = subparsers.add_parser("revoke", help="Revoke read access from an address")
+    revoke_parser.add_argument("reader", type=str, help="Address to revoke access from")
+    revoke_parser.add_argument("--doc-type", type=int, required=True, help="Doc type to revoke")
+
+    # restore — restore a file from on-chain
+    restore_parser = subparsers.add_parser("restore", help="Restore a file from on-chain storage")
+    restore_parser.add_argument("--doc-type", type=int, required=True, help="Doc type to restore")
+    restore_parser.add_argument("--version", type=int, default=None, help="Specific version (default: latest)")
+    restore_parser.add_argument("--output", type=str, default=None, help="Output file path (default: stdout)")
+
+    # hierarchy — show agent hierarchy
+    hier_parser = subparsers.add_parser("hierarchy", help="Show multi-agent hierarchy")
+    hier_parser.add_argument("--register-child", type=str, default=None, help="Register a child agent address")
 
     args = parser.parse_args()
 
@@ -80,9 +119,8 @@ def main():
                 print(f"  {name} (type {info['docType']}): {info['path']}")
 
     elif args.command == "register":
-        from .core import SoulChainEngine
         logging.basicConfig(level=logging.INFO)
-        engine = SoulChainEngine(load_private_key(), config=load_config())
+        engine = _load_engine()
         if engine.is_registered():
             print("Soul already registered")
         else:
@@ -92,6 +130,67 @@ def main():
             else:
                 print("❌ Registration failed")
                 sys.exit(1)
+
+    elif args.command == "grant":
+        logging.basicConfig(level=logging.INFO)
+        engine = _load_engine()
+        print(f"Granting access to {args.reader} for doc type {args.doc_type}...")
+        tx = engine.grant_access(args.reader, args.doc_type)
+        if tx:
+            print(f"✅ Access granted: {EXPLORER}/tx/{tx}")
+        else:
+            print("❌ Grant failed")
+            sys.exit(1)
+
+    elif args.command == "revoke":
+        logging.basicConfig(level=logging.INFO)
+        engine = _load_engine()
+        print(f"Revoking access from {args.reader} for doc type {args.doc_type}...")
+        tx = engine.revoke_access(args.reader, args.doc_type)
+        if tx:
+            print(f"✅ Access revoked: {EXPLORER}/tx/{tx}")
+        else:
+            print("❌ Revoke failed")
+            sys.exit(1)
+
+    elif args.command == "restore":
+        logging.basicConfig(level=logging.INFO)
+        engine = _load_engine()
+        print(f"Restoring doc type {args.doc_type} (version: {args.version or 'latest'})...")
+        content = engine.restore_file(args.doc_type, args.version)
+        if content is None:
+            print("❌ Restore failed")
+            sys.exit(1)
+        if args.output:
+            Path(args.output).expanduser().write_bytes(content)
+            print(f"✅ Restored {len(content)}B → {args.output}")
+        else:
+            print(f"✅ Restored {len(content)}B:")
+            sys.stdout.buffer.write(content)
+            sys.stdout.buffer.write(b"\n")
+
+    elif args.command == "hierarchy":
+        logging.basicConfig(level=logging.WARNING)
+        engine = _load_engine()
+
+        if args.register_child:
+            print(f"Registering child: {args.register_child}...")
+            tx = engine.register_child(args.register_child)
+            if tx:
+                print(f"✅ Child registered: {EXPLORER}/tx/{tx}")
+            else:
+                print("❌ Child registration failed")
+                sys.exit(1)
+
+        h = engine.get_hierarchy()
+        print(f"Agent:    {h['agent']}")
+        print(f"Parent:   {h['parent'] or '(none)'}")
+        if h["children"]:
+            print(f"Children ({h['childCount']}):")
+            for c in h["children"]:
+                print(f"  - {c}")
+        else:
+            print("Children: (none)")
 
 
 if __name__ == "__main__":

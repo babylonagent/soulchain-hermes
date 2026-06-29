@@ -1,15 +1,27 @@
 {
   "chain": {
-    "rpcUrl": "https://mainnet.base.org",
+    "rpcUrl": "https://base-mainnet.g.alchemy.com/v2/e3ZmVc6Z6gRONLz2nmgOO",
     "chainId": 8453,
     "contractAddress": "0x2AE3F15CAD486226Af839ae8FB4BbA08428283A2",
     "explorer": "https://basescan.org"
   },
   "trackedFiles": {
-    "SOUL":     { "docType": 0,  "path": "~/.hermes/SOUL.md" },
-    "MEMORY":   { "docType": 1,  "path": "~/.hermes/memories/MEMORY.md" },
-    "USER":     { "docType": 3,  "path": "~/.hermes/memories/USER.md" },
-    "IDENTITY": { "docType": 10, "path": "~/.hermes/config.yaml" }
+    "SOUL": {
+      "docType": 0,
+      "path": "~/.hermes/SOUL.md"
+    },
+    "MEMORY": {
+      "docType": 1,
+      "path": "~/.hermes/memories/MEMORY.md"
+    },
+    "USER": {
+      "docType": 3,
+      "path": "~/.hermes/memories/USER.md"
+    },
+    "IDENTITY": {
+      "docType": 10,
+      "path": "~/.hermes/config.yaml"
+    }
   },
   "storage": "local",
   "syncMode": "on-write",

@@ -15,6 +15,7 @@
     --green: #00d97e;
     --red: #ff4444;
     --yellow: #ffd000;
+    --blue: #3B82F6;
     --mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -98,6 +99,7 @@
     font-size: 0.8rem;
     color: var(--muted);
     margin-top: 0.8rem;
+    flex-wrap: wrap;
   }
   .status-badge {
     display: inline-flex;
@@ -114,6 +116,56 @@
   .dot.mismatch { background: var(--red); }
   .dot.pending { background: var(--yellow); }
   .loading { text-align: center; padding: 3rem; color: var(--muted); }
+
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 2.5rem 0 1rem;
+    color: var(--text);
+  }
+
+  .hierarchy-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .hier-row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .hier-row:last-child { border-bottom: none; }
+  .hier-label { color: var(--muted); font-size: 0.85rem; min-width: 80px; }
+  .hier-value { font-family: var(--mono); font-size: 0.85rem; }
+  .hier-value a { color: var(--accent); text-decoration: none; }
+  .child-list { display: flex; flex-direction: column; gap: 0.3rem; }
+
+  .grant-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .grant-card .grant-info { display: flex; align-items: center; gap: 0.8rem; }
+  .grant-card .grant-doc { font-weight: 600; font-size: 0.95rem; }
+  .grant-card .grant-doc-type { color: var(--muted); font-size: 0.8rem; font-family: var(--mono); }
+  .grant-status {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    background: var(--bg);
+    font-family: var(--mono);
+  }
+  .grant-status.yes { color: var(--green); }
+  .grant-status.no { color: var(--muted); }
+
   .footer {
     text-align: center;
     margin-top: 3rem;
@@ -140,7 +192,7 @@
     <div class="logo">🔗</div>
     <div class="title">SoulChain</div>
     <div class="subtitle">Identity that survives destruction — anchored on Base</div>
-    <div class="chain-badge">Base L2 · SoulRegistry</div>
+    <div class="chain-badge">Base L2 · SoulRegistry · Phase 3</div>
   </div>
 
   <div class="agent-info">
@@ -166,6 +218,16 @@
     <div class="loading">Reading from SoulRegistry on Base...</div>
   </div>
 
+  <div class="section-title">🔐 Access Grants</div>
+  <div class="docs-list" id="grants-list">
+    <div class="loading">Loading access status...</div>
+  </div>
+
+  <div class="section-title">👥 Agent Hierarchy</div>
+  <div id="hierarchy-section">
+    <div class="loading">Loading hierarchy...</div>
+  </div>
+
   <div class="footer">
     <p>Built by <a href="https://github.com/babylonagent/soulchain-hermes">Babylon Agent</a> ·
        Based on <a href="https://github.com/openClause/soulchain">openClause/soulchain</a> (MIT)</p>
@@ -179,7 +241,7 @@
 <script>
 const CONTRACT_ADDR = "0x2AE3F15CAD486226Af839ae8FB4BbA08428283A2";
 const AGENT_ADDR = "0x8741b8a825644D9Ef18Faf2DAB5e9b47B900F2b6";
-const RPC_URL = "https://mainnet.base.org"; // Public — for production use Alchemy/Infura
+const RPC_URL = "https://mainnet.base.org";
 const EXPLORER = "https://basescan.org";
 
 const DOC_TYPES = [
@@ -194,7 +256,15 @@ const ABI = [
   "function documentCount(address, uint8) view returns (uint32)",
   "function latestDocument(address, uint8) view returns ((bytes32 contentHash, bytes32 encryptedHash, string storageCid, uint8 docType, uint64 timestamp, uint32 version, bytes32 prevHash, bytes signature))",
   "function verifyDocument(address, uint8, uint32, bytes32) view returns (bool)",
+  "function hasAccess(address, address, uint8) view returns (bool)",
+  "function getChildren(address) view returns (address[])",
+  "function getParent(address) view returns (address)",
 ];
+
+function shorten(addr) {
+  if (!addr || addr === ethers.ZeroAddress) return "(none)";
+  return addr.slice(0, 10) + "..." + addr.slice(-8);
+}
 
 async function loadData() {
   try {
@@ -203,10 +273,9 @@ async function loadData() {
 
     // Agent info
     const isRegistered = await contract.registered(AGENT_ADDR);
-    document.getElementById("agent-addr").textContent =
-      AGENT_ADDR.slice(0, 10) + "..." + AGENT_ADDR.slice(-8);
-    document.getElementById("contract-link").textContent =
-      CONTRACT_ADDR.slice(0, 10) + "..." + CONTRACT_ADDR.slice(-8);
+    document.getElementById("agent-addr").textContent = shorten(AGENT_ADDR);
+    document.getElementById("agent-addr").title = AGENT_ADDR;
+    document.getElementById("contract-link").textContent = shorten(CONTRACT_ADDR);
     document.getElementById("contract-link").href = `${EXPLORER}/address/${CONTRACT_ADDR}`;
     document.getElementById("registered").textContent = isRegistered ? "✅ Yes" : "❌ No";
 
@@ -270,6 +339,70 @@ async function loadData() {
 
     document.getElementById("total-anchors").textContent = totalAnchors;
     document.getElementById("docs-list").innerHTML = docsHtml;
+
+    // ── Access Grants (self-access check per doc type) ──
+    let grantsHtml = "";
+    for (const doc of DOC_TYPES) {
+      try {
+        const hasAccess = await contract.hasAccess(AGENT_ADDR, AGENT_ADDR, doc.type);
+        grantsHtml += `
+          <div class="grant-card">
+            <div class="grant-info">
+              <span class="grant-doc">${doc.name}</span>
+              <span class="grant-doc-type">type ${doc.type}</span>
+            </div>
+            <span class="grant-status ${hasAccess ? 'yes' : 'no'}">
+              ${hasAccess ? '✅ Owner access' : '❌ No access'}
+            </span>
+          </div>
+        `;
+      } catch (e) {
+        grantsHtml += `
+          <div class="grant-card">
+            <div class="grant-info">
+              <span class="grant-doc">${doc.name}</span>
+              <span class="grant-doc-type">type ${doc.type}</span>
+            </div>
+            <span class="grant-status no">N/A</span>
+          </div>
+        `;
+      }
+    }
+    document.getElementById("grants-list").innerHTML = grantsHtml;
+
+    // ── Agent Hierarchy ──
+    try {
+      const [parent, children] = await Promise.all([
+        contract.getParent(AGENT_ADDR),
+        contract.getChildren(AGENT_ADDR),
+      ]);
+
+      let hierHtml = '<div class="hierarchy-card">';
+      hierHtml += `<div class="hier-row">
+        <span class="hier-label">Parent</span>
+        <span class="hier-value">${parent && parent !== ethers.ZeroAddress
+          ? `<a href="${EXPLORER}/address/${parent}" target="_blank">${shorten(parent)}</a>`
+          : '(none)'}</span>
+      </div>`;
+
+      const childList = children.filter(c => c !== ethers.ZeroAddress);
+      hierHtml += `<div class="hier-row">
+        <span class="hier-label">Children</span>
+        <span class="hier-value">
+          ${childList.length > 0
+            ? `<div class="child-list">${childList.map(c =>
+                `<div><a href="${EXPLORER}/address/${c}" target="_blank">${shorten(c)}</a></div>`
+              ).join('')}</div>`
+            : '(none)'}
+        </span>
+      </div>`;
+      hierHtml += '</div>';
+
+      document.getElementById("hierarchy-section").innerHTML = hierHtml;
+    } catch (e) {
+      document.getElementById("hierarchy-section").innerHTML =
+        `<div class="hierarchy-card"><div class="loading">Hierarchy data unavailable</div></div>`;
+    }
 
   } catch (e) {
     document.getElementById("docs-list").innerHTML =

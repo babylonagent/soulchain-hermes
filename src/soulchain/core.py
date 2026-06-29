@@ -83,6 +83,22 @@ SOUL_REGISTRY_ABI = [
     {"inputs": [
         {"name": "agent", "type": "address"},
         {"name": "docType", "type": "uint8"},
+        {"name": "version", "type": "uint32"},
+    ], "name": "documentAt", "outputs": [
+        {"components": [
+            {"name": "contentHash", "type": "bytes32"},
+            {"name": "encryptedHash", "type": "bytes32"},
+            {"name": "storageCid", "type": "string"},
+            {"name": "docType", "type": "uint8"},
+            {"name": "timestamp", "type": "uint64"},
+            {"name": "version", "type": "uint32"},
+            {"name": "prevHash", "type": "bytes32"},
+            {"name": "signature", "type": "bytes"},
+        ], "name": "", "type": "tuple"},
+    ], "stateMutability": "view", "type": "function"},
+    {"inputs": [
+        {"name": "agent", "type": "address"},
+        {"name": "docType", "type": "uint8"},
     ], "name": "documentCount", "outputs": [{"name": "", "type": "uint32"}],
      "stateMutability": "view", "type": "function"},
     {"inputs": [
@@ -94,6 +110,50 @@ SOUL_REGISTRY_ABI = [
      "stateMutability": "view", "type": "function"},
     {"inputs": [{"name": "", "type": "address"}],
      "name": "registered", "outputs": [{"name": "", "type": "bool"}],
+     "stateMutability": "view", "type": "function"},
+    # ── Phase 3: Access grants ──
+    {"inputs": [
+        {"name": "reader", "type": "address"},
+        {"name": "docType", "type": "uint8"},
+    ], "name": "grantAccess", "outputs": [],
+     "stateMutability": "nonpayable", "type": "function"},
+    {"inputs": [
+        {"name": "reader", "type": "address"},
+        {"name": "docType", "type": "uint8"},
+    ], "name": "revokeAccess", "outputs": [],
+     "stateMutability": "nonpayable", "type": "function"},
+    {"inputs": [
+        {"name": "agent", "type": "address"},
+        {"name": "reader", "type": "address"},
+        {"name": "docType", "type": "uint8"},
+    ], "name": "hasAccess", "outputs": [{"name": "", "type": "bool"}],
+     "stateMutability": "view", "type": "function"},
+    {"inputs": [
+        {"name": "reader", "type": "address"},
+        {"name": "docType", "type": "uint8"},
+        {"name": "encryptedKey", "type": "bytes"},
+    ], "name": "storeAccessKey", "outputs": [],
+     "stateMutability": "nonpayable", "type": "function"},
+    {"inputs": [
+        {"name": "owner", "type": "address"},
+        {"name": "reader", "type": "address"},
+        {"name": "docType", "type": "uint8"},
+    ], "name": "getAccessKey", "outputs": [{"name": "", "type": "bytes"}],
+     "stateMutability": "view", "type": "function"},
+    {"inputs": [
+        {"name": "reader", "type": "address"},
+        {"name": "docType", "type": "uint8"},
+    ], "name": "removeAccessKey", "outputs": [],
+     "stateMutability": "nonpayable", "type": "function"},
+    # ── Phase 3: Multi-agent hierarchy ──
+    {"inputs": [{"name": "child", "type": "address"}],
+     "name": "registerChild", "outputs": [],
+     "stateMutability": "nonpayable", "type": "function"},
+    {"inputs": [{"name": "", "type": "address"}],
+     "name": "getChildren", "outputs": [{"name": "", "type": "address[]"}],
+     "stateMutability": "view", "type": "function"},
+    {"inputs": [{"name": "", "type": "address"}],
+     "name": "getParent", "outputs": [{"name": "", "type": "address"}],
      "stateMutability": "view", "type": "function"},
 ]
 
@@ -435,6 +495,123 @@ class SoulChainEngine:
         except Exception as e:
             logger.error(f"Restore failed: {e}")
             return None
+
+    # ─── Phase 3: Access Grants ───────────────────────────────────────────
+
+    def grant_access(self, reader: str, doc_type: int) -> Optional[str]:
+        """Grant read access to another address for a doc type."""
+        if not self.is_registered():
+            logger.error("Soul not registered")
+            return None
+        reader = Web3.to_checksum_address(reader)
+        nonce = self.w3.eth.get_transaction_count(self.account.address, "pending")
+        base_fee = self.w3.eth.get_block("latest")["baseFeePerGas"]
+        priority_fee = max(1000, self.w3.eth.max_priority_fee)
+        max_fee = int(base_fee * 2) + priority_fee
+        tx = self.contract.functions.grantAccess(reader, doc_type).build_transaction({
+            "from": self.account.address,
+            "nonce": nonce, "gas": 100000,
+            "maxFeePerGas": max_fee, "maxPriorityFeePerGas": priority_fee,
+            "chainId": CHAIN_ID, "type": 2,
+        })
+        signed = self.account.sign_transaction(tx)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
+        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+        if receipt["status"] == 1:
+            logger.info(f"✅ Access granted: {reader} for doc type {doc_type}")
+            return tx_hash.hex()
+        logger.error("Access grant failed")
+        return None
+
+    def revoke_access(self, reader: str, doc_type: int) -> Optional[str]:
+        """Revoke read access from an address for a doc type."""
+        if not self.is_registered():
+            logger.error("Soul not registered")
+            return None
+        reader = Web3.to_checksum_address(reader)
+        nonce = self.w3.eth.get_transaction_count(self.account.address, "pending")
+        base_fee = self.w3.eth.get_block("latest")["baseFeePerGas"]
+        priority_fee = max(1000, self.w3.eth.max_priority_fee)
+        max_fee = int(base_fee * 2) + priority_fee
+        tx = self.contract.functions.revokeAccess(reader, doc_type).build_transaction({
+            "from": self.account.address,
+            "nonce": nonce, "gas": 100000,
+            "maxFeePerGas": max_fee, "maxPriorityFeePerGas": priority_fee,
+            "chainId": CHAIN_ID, "type": 2,
+        })
+        signed = self.account.sign_transaction(tx)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
+        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+        if receipt["status"] == 1:
+            logger.info(f"✅ Access revoked: {reader} for doc type {doc_type}")
+            return tx_hash.hex()
+        logger.error("Access revoke failed")
+        return None
+
+    def has_access(self, agent: str, reader: str, doc_type: int) -> bool:
+        """Check if reader has access to agent's doc type."""
+        agent = Web3.to_checksum_address(agent)
+        reader = Web3.to_checksum_address(reader)
+        return self.contract.functions.hasAccess(agent, reader, doc_type).call()
+
+    def get_access_grants_summary(self) -> list[dict]:
+        """Check access status for all tracked doc types against the caller's own address.
+        Returns a summary of whether the owner can access each doc type (self-access always true for registered souls)."""
+        results = []
+        for name, info in self.config["trackedFiles"].items():
+            dt = info["docType"]
+            has = self.has_access(self.account.address, self.account.address, dt)
+            results.append({
+                "name": name, "docType": dt, "selfAccess": has,
+            })
+        return results
+
+    # ─── Phase 3: Multi-Agent Hierarchy ───────────────────────────────────
+
+    def register_child(self, child_address: str) -> Optional[str]:
+        """Register a child agent under this soul."""
+        if not self.is_registered():
+            logger.error("Soul not registered")
+            return None
+        child_address = Web3.to_checksum_address(child_address)
+        nonce = self.w3.eth.get_transaction_count(self.account.address, "pending")
+        base_fee = self.w3.eth.get_block("latest")["baseFeePerGas"]
+        priority_fee = max(1000, self.w3.eth.max_priority_fee)
+        max_fee = int(base_fee * 2) + priority_fee
+        tx = self.contract.functions.registerChild(child_address).build_transaction({
+            "from": self.account.address,
+            "nonce": nonce, "gas": 100000,
+            "maxFeePerGas": max_fee, "maxPriorityFeePerGas": priority_fee,
+            "chainId": CHAIN_ID, "type": 2,
+        })
+        signed = self.account.sign_transaction(tx)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
+        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+        if receipt["status"] == 1:
+            logger.info(f"✅ Child registered: {child_address}")
+            return tx_hash.hex()
+        logger.error("Child registration failed")
+        return None
+
+    def get_children(self) -> list[str]:
+        """Get all child agent addresses."""
+        raw = self.contract.functions.getChildren(self.account.address).call()
+        return [addr for addr in raw if addr != "0x" + "00" * 20]
+
+    def get_parent(self) -> str:
+        """Get parent agent address (if any)."""
+        return self.contract.functions.getParent(self.account.address).call()
+
+    def get_hierarchy(self) -> dict:
+        """Get full hierarchy: parent + children."""
+        parent = self.get_parent()
+        children = self.get_children()
+        return {
+            "agent": self.account.address,
+            "parent": parent if parent != "0x" + "00" * 20 else None,
+            "children": children,
+            "childCount": len(children),
+        }
 
 
 def load_config(config_path: str = None) -> dict:

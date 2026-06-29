@@ -10,7 +10,7 @@ SoulChain anchors your Hermes Agent's identity and memory onto the Base blockcha
 
 When a VPS dies, a disk corrupts, or a provider shuts down — the agent's soul survives.
 
-## Status: Phase 2 — ✅ THREE SYNC MODES
+## Status: Phase 3 — ✅ COMPLETE
 
 | Component | Status |
 |---|---|
@@ -21,16 +21,25 @@ When a VPS dies, a disk corrupts, or a provider shuts down — the agent's soul 
 | Unified CLI | ✅ `soulchain anchor`, `soulchain start`, `soulchain config` |
 | Systemd services | ✅ Both on-write and interval service files |
 | Smart skip | ✅ Only anchors files that actually changed |
+| Encryption layer | ✅ Ed25519 + AES-256-GCM + argon2id keystore |
+| Encrypted blob storage | ✅ LocalStorage (default) + Pinata IPFS adapter |
+| Hermes skill | ✅ Auto-loaded, status in agent context |
+| Access grants | ✅ Grant/revoke read access per doc type |
+| Multi-agent hierarchy | ✅ Parent/child registration on-chain |
+| Restore from chain | ✅ Download + decrypt + verify |
+| Public dashboard | ✅ Docs, access grants, hierarchy |
 
 ### Proven test results
 
-All three modes verified with real on-chain transactions on Base mainnet:
+All three sync modes verified with real on-chain transactions on Base mainnet:
 
 | Mode | Test | Result |
 |---|---|---|
 | `on-write` | Appended to MEMORY.md → auto-anchored in ~7s | ✅ v0→v1 |
 | `interval` | Appended to USER.md → picked up in 10s cycle | ✅ v0→v1 |
 | `manual` | `soulchain anchor` → skips unchanged, anchors diffs | ✅ Working |
+| Encryption | Daemon auto-encrypts with AES-256-GCM before anchoring | ✅ Encrypted blobs in storage |
+| Restore | `soulchain restore --doc-type 0` → downloads, decrypts, verifies hash | ✅ Working |
 
 ## Quick Start
 
@@ -52,6 +61,18 @@ soulchain anchor --verify         # verify local vs on-chain
 # Daemon mode — continuous sync
 soulchain start --mode on-write   # file watcher (anchors within 2s)
 soulchain start --mode interval   # periodic (every 5 min by default)
+
+# Phase 3 — Access control
+soulchain grant 0xABC... --doc-type 0   # grant SOUL read access to an address
+soulchain revoke 0xABC... --doc-type 0  # revoke access
+
+# Phase 3 — Restore from chain
+soulchain restore --doc-type 0           # restore latest SOUL.md
+soulchain restore --doc-type 1 --output /tmp/memory.md  # restore to file
+
+# Phase 3 — Multi-agent hierarchy
+soulchain hierarchy                      # show parent + children
+soulchain hierarchy --register-child 0xDEF...  # register child agent
 ```
 
 ## Sync Modes
@@ -176,13 +197,20 @@ Effectively free. Base L2 gas is ~0.005 gwei.
 - [x] Systemd service files
 - [x] Smart skip (only anchor changed files)
 
-### Phase 3 — Advanced (next)
-- [ ] Encryption layer (Ed25519 + AES-256)
-- [ ] IPFS/Arweave storage for encrypted blobs
-- [ ] Hermes skill (auto-load, status in agent context)
-- [ ] Access grants (let others verify your identity)
-- [ ] Multi-agent hierarchy (parent/child on-chain)
-- [ ] Public verification dashboard
+### Phase 3 — Advanced ✅
+- [x] Encryption layer (Ed25519 + AES-256-GCM + argon2id keystore)
+- [x] Encrypted blob storage (LocalStorage + Pinata IPFS adapter)
+- [x] Hermes skill (auto-load, status in agent context)
+- [x] Access grants (grant/revoke read access per doc type)
+- [x] Multi-agent hierarchy (parent/child on-chain)
+- [x] Public verification dashboard (docs, grants, hierarchy)
+- [x] Restore from chain (download + decrypt + verify)
+
+### Phase 4 — Distribution (next)
+- [ ] npm/pip package publish
+- [ ] Cross-agent verification API (verify any agent's soul)
+- [ ] Version timeline UI (browse all versions of each doc)
+- [ ] IPFS pinning service integration (auto-pin on anchor)
 
 ## Credit
 
