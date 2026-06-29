@@ -48,7 +48,18 @@ def run():
 
     config = load_config()
     private_key = load_private_key()
-    engine = SoulChainEngine(private_key, config=config)
+
+    # Load crypto provider if keystore exists (enables encryption + restore)
+    import os as _os
+    crypto = None
+    keystore_path = _os.environ.get("SOULCHAIN_KEYSTORE", _os.path.expanduser("~/.soulchain/keystore.json"))
+    if _os.path.exists(keystore_path):
+        passphrase = _os.environ.get("SOULCHAIN_KEYSTORE_PASSWORD")
+        if passphrase:
+            from ..crypto import SoulCryptoProvider
+            crypto = SoulCryptoProvider.from_keystore(keystore_path, passphrase)
+
+    engine = SoulChainEngine(private_key, config=config, crypto=crypto)
 
     # ─── Status ───
     if args.status:
