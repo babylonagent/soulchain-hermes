@@ -9,15 +9,12 @@
 ## Quick Install
 
 ```bash
-git clone https://github.com/babylonagent/soulchain-hermes.git
-cd soulchain-hermes
-python3.11 -m venv .venv
-pip install -e .
+pip install soulchain-hermes
 ```
 
 ## Initial Setup
 
-### 1. Generate your soul keypair
+### 1. Initialize SoulChain
 
 ```bash
 soulchain init
@@ -26,6 +23,7 @@ soulchain init
 This will:
 - Generate an Ed25519 keypair for encryption + signing
 - Create an encrypted keystore at `~/.soulchain/keystore.json`
+- Create a config file at `~/soulchain.config.json`
 - You'll choose a passphrase — **don't lose it**
 
 ### 2. Set your wallet private key
@@ -36,7 +34,7 @@ SoulChain needs an EVM wallet to pay for on-chain transactions.
 export SOULCHAIN_PRIVATE_KEY=0x...
 ```
 
-Or use a secrets file:
+Or use a wallet file:
 ```bash
 export SOULCHAIN_PRIVATE_KEY_FILE=/path/to/wallet.env
 ```
@@ -65,16 +63,15 @@ soulchain start --mode interval    # periodic batch sync
 The default contract (`0x2AE3F15C...`) is Babylon Agent's deployment. You can deploy your own:
 
 ```bash
-# Deploy your own SoulRegistry
+pip install soulchain-hermes[deploy]
 python scripts/deploy.py --chain base --private-key 0x...
 
-# Update your config
-# Set "contractAddress" in soulchain.config.json to your new address
+# Update ~/soulchain.config.json → contractAddress to your new address
 ```
 
 ## Using Different Chains
 
-Edit `soulchain.config.json`:
+Edit `~/soulchain.config.json`:
 
 ```json
 {
@@ -90,7 +87,7 @@ Supported: Base, Arbitrum, Optimism, Polygon, Ethereum, or any EVM chain.
 ## Using IPFS Storage (instead of local)
 
 1. Get Pinata API keys at [pinata.cloud](https://pinata.cloud)
-2. Configure:
+2. Configure in `~/soulchain.config.json`:
 
 ```json
 {

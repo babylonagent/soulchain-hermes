@@ -10,7 +10,7 @@ SoulChain anchors your Hermes Agent's identity and memory onto the Base blockcha
 
 When a VPS dies, a disk corrupts, or a provider shuts down — the agent's soul survives.
 
-## Status: Phase 3 — ✅ COMPLETE
+## Status: Phase 4 — ✅ PyPI Published
 
 | Component | Status |
 |---|---|
@@ -18,16 +18,12 @@ When a VPS dies, a disk corrupts, or a provider shuts down — the agent's soul 
 | `on-write` daemon | ✅ Watchdog file watcher — anchors within 2s of change |
 | `interval` daemon | ✅ Periodic batch sync — configurable interval |
 | `manual` CLI | ✅ On-demand anchor, status, verify |
-| Unified CLI | ✅ `soulchain anchor`, `soulchain start`, `soulchain config` |
-| Systemd services | ✅ Both on-write and interval service files |
-| Smart skip | ✅ Only anchors files that actually changed |
 | Encryption layer | ✅ Ed25519 + AES-256-GCM + argon2id keystore |
-| Encrypted blob storage | ✅ LocalStorage (default) + Pinata IPFS adapter |
-| Hermes skill | ✅ Auto-loaded, status in agent context |
 | Access grants | ✅ Grant/revoke read access per doc type |
 | Multi-agent hierarchy | ✅ Parent/child registration on-chain |
-| Restore from chain | ✅ Download + decrypt + verify |
-| Public dashboard | ✅ Docs, access grants, hierarchy |
+| Restore from chain | ✅ Download + decrypt + verify hash |
+| **PyPI package** | ✅ `pip install soulchain-hermes` |
+| **`soulchain init`** | ✅ Interactive first-time setup |
 
 ### Proven test results
 
@@ -44,16 +40,19 @@ All three sync modes verified with real on-chain transactions on Base mainnet:
 ## Quick Start
 
 ```bash
-# Install
-git clone https://github.com/babylonagent/soulchain-hermes.git
-cd soulchain-hermes
-python3.11 -m venv .venv
-pip install -e .
+# Install from PyPI
+pip install soulchain-hermes
 
-# Configure private key
+# Initialize (generates keystore + config)
+soulchain init
+
+# Set your wallet private key (Base recommended — cheapest gas)
 export SOULCHAIN_PRIVATE_KEY=0x...
 
-# Manual mode — anchor on demand
+# Register on-chain (one-time, costs gas)
+soulchain register
+
+# Anchor your files
 soulchain anchor                  # anchor changed files
 soulchain anchor --status         # show on-chain status
 soulchain anchor --verify         # verify local vs on-chain
@@ -62,15 +61,15 @@ soulchain anchor --verify         # verify local vs on-chain
 soulchain start --mode on-write   # file watcher (anchors within 2s)
 soulchain start --mode interval   # periodic (every 5 min by default)
 
-# Phase 3 — Access control
+# Access control
 soulchain grant 0xABC... --doc-type 0   # grant SOUL read access to an address
 soulchain revoke 0xABC... --doc-type 0  # revoke access
 
-# Phase 3 — Restore from chain
+# Restore from chain
 soulchain restore --doc-type 0           # restore latest SOUL.md
 soulchain restore --doc-type 1 --output /tmp/memory.md  # restore to file
 
-# Phase 3 — Multi-agent hierarchy
+# Multi-agent hierarchy
 soulchain hierarchy                      # show parent + children
 soulchain hierarchy --register-child 0xDEF...  # register child agent
 ```
