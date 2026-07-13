@@ -65,6 +65,9 @@ def main():
     # register — register soul
     reg_parser = subparsers.add_parser("register", help="Register soul (one-time)")
 
+    # init — first-time setup
+    init_parser = subparsers.add_parser("init", help="Initialize SoulChain (generate keystore + config)")
+
     # grant — grant access to another address
     grant_parser = subparsers.add_parser("grant", help="Grant read access to another address")
     grant_parser.add_argument("reader", type=str, help="Address to grant access to")
@@ -130,6 +133,78 @@ def main():
             else:
                 print("❌ Registration failed")
                 sys.exit(1)
+
+    elif args.command == "init":
+        import getpass
+        import shutil
+        from .crypto import SoulCryptoProvider, save_keystore
+
+        print("╔══════════════════════════════════════════╗")
+        print("║     SoulChain — Initial Setup            ║")
+        print("╚══════════════════════════════════════════╝")
+        print()
+
+        keystore_path = os.environ.get(
+            "SOULCHAIN_KEYSTORE", os.path.expanduser("~/.soulchain/keystore.json")
+        )
+
+        # 1. Generate keystore
+        if os.path.exists(keystore_path):
+            print(f"Keystore already exists at {keystore_path}")
+            overwrite = input("Overwrite? (y/N): ").strip().lower()
+            if overwrite != "y":
+                print("Keeping existing keystore.")
+            else:
+                passphrase = getpass.getpass("Choose a passphrase: ")
+                passphrase2 = getpass.getpass("Confirm passphrase: ")
+                if passphrase != passphrase2:
+                    print("❌ Passphrases don't match")
+                    sys.exit(1)
+                provider = SoulCryptoProvider.generate()
+                provider.save(passphrase, keystore_path)
+                print(f"✅ Keystore generated: {keystore_path}")
+                print(f"   Soul address: {provider.address}")
+        else:
+            passphrase = getpass.getpass("Choose a passphrase: ")
+            passphrase2 = getpass.getpass("Confirm passphrase: ")
+            if passphrase != passphrase2:
+                print("❌ Passphrases don't match")
+                sys.exit(1)
+            provider = SoulCryptoProvider.generate()
+            provider.save(passphrase, keystore_path)
+            print(f"✅ Keystore generated: {keystore_path}")
+            print(f"   Soul address: {provider.address}")
+
+        print()
+
+        # 2. Create config file
+        config_path = os.path.expanduser("~/soulchain.config.json")
+        example_path = Path(__file__).parent.parent.parent / "soulchain.config.example.json"
+
+        if os.path.exists(config_path):
+            print(f"Config already exists at {config_path}")
+        elif example_path.exists():
+            shutil.copy(example_path, config_path)
+            print(f"✅ Config created: {config_path}")
+            print("   Edit it to set your RPC URL and contract address.")
+        else:
+            # Fallback: write default config
+            with open(config_path, "w") as f:
+                json.dump(DEFAULT_CONFIG, f, indent=2)
+            print(f"✅ Config created: {config_path}")
+
+        print()
+        print("Next steps:")
+        print("  1. Set your wallet private key:")
+        print("     export SOULCHAIN_PRIVATE_KEY=0x...")
+        print("  2. Register your soul on-chain:")
+        print("     soulchain register")
+        print("  3. Anchor your files:")
+        print("     soulchain anchor")
+        print()
+        print("For daemon mode:")
+        print("  export SOULCHAIN_KEYSTORE_PASSWORD=your_passphrase")
+        print("  soulchain start --mode on-write")
 
     elif args.command == "grant":
         logging.basicConfig(level=logging.INFO)

@@ -21,3 +21,6 @@ test-*.config.json
 
 # Keep the contract artifacts (needed for deployment)
 !contracts/artifacts/
+
+# Local config (contains user RPC keys)
+soulchain.config.json

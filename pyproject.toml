@@ -1,6 +1,6 @@
 [project]
 name = "soulchain-hermes"
-version = "0.3.1"
+version = "0.3.2"
 description = "SoulChain for Hermes Agent — Sovereign AI memory, anchored on Base"
 readme = "README.md"
 license = { text = "MIT" }
@@ -55,3 +55,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 soulchain = ["py.typed"]
+
+[tool.setuptools.data-files]
+"." = ["soulchain.config.example.json"]

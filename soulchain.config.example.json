@@ -1,6 +1,6 @@
 {
   "chain": {
-    "rpcUrl": "https://base-mainnet.g.alchemy.com/v2/***REMOVED***",
+    "rpcUrl": "https://mainnet.base.org",
     "chainId": 8453,
     "contractAddress": "0x2AE3F15CAD486226Af839ae8FB4BbA08428283A2",
     "explorer": "https://basescan.org"
