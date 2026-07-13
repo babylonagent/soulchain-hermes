@@ -134,10 +134,23 @@ contract SoulRegistry {
         emit AccessGranted(msg.sender, reader, docType);
     }
 
-    /// @notice Revoke read access
+    /// @notice Revoke read access and delete access keys
     function revokeAccess(address reader, uint8 docType) external onlyRegistered {
         accessGrants[msg.sender][reader][docType] = false;
+        delete accessKeys[msg.sender][reader][docType];
         emit AccessRevoked(msg.sender, reader, docType);
+    }
+
+    /// @notice Check if a potential child is in the caller's ancestry (cycle prevention)
+    function _isAncestor(address _parent, address _descendant) internal view returns (bool) {
+        address current = _descendant;
+        for (uint256 i = 0; i < 100; i++) {
+            address p = parent[current];
+            if (p == address(0)) return false;
+            if (p == _parent) return true;
+            current = p;
+        }
+        return false;
     }
 
     /// @notice Check if access is granted (includes parent access)
@@ -150,6 +163,7 @@ contract SoulRegistry {
         require(registered[child], "Child not registered");
         require(parent[child] == address(0), "Child already has parent");
         require(child != msg.sender, "Cannot be own child");
+        require(!_isAncestor(msg.sender, child), "Cycle detected: child is an ancestor");
         parent[child] = msg.sender;
         children[msg.sender].push(child);
         emit ChildRegistered(msg.sender, child);

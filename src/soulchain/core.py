@@ -25,7 +25,6 @@ logger = logging.getLogger("soulchain")
 # ─── Constants ────────────────────────────────────────────────────────────────
 
 CONTRACT_ADDRESS = "0x2AE3F15CAD486226Af839ae8FB4BbA08428283A2"
-CHAIN_ID = 8453
 EXPLORER = "https://basescan.org"
 
 DEFAULT_CONFIG = {
@@ -195,6 +194,9 @@ class SoulChainEngine:
             address=Web3.to_checksum_address(contract_addr),
             abi=SOUL_REGISTRY_ABI,
         )
+        
+        # Chain ID from config (allows multi-chain support)
+        self._chain_id = self.config.get("chain", {}).get("chainId", 8453)
 
         # State cache: track last anchored hashes to avoid redundant txs
         self._last_hashes: dict[int, str] = {}
@@ -243,7 +245,7 @@ class SoulChainEngine:
             "gas": 100000,
             "maxFeePerGas": max_fee,
             "maxPriorityFeePerGas": priority_fee,
-            "chainId": CHAIN_ID,
+            "chainId": self._chain_id,
             "type": 2,
         })
         signed = self.account.sign_transaction(tx)
@@ -348,7 +350,7 @@ class SoulChainEngine:
             "gas": gas_limit,
             "maxFeePerGas": max_fee,
             "maxPriorityFeePerGas": priority_fee,
-            "chainId": CHAIN_ID,
+            "chainId": self._chain_id,
             "type": 2,
         })
 
@@ -512,7 +514,7 @@ class SoulChainEngine:
             "from": self.account.address,
             "nonce": nonce, "gas": 100000,
             "maxFeePerGas": max_fee, "maxPriorityFeePerGas": priority_fee,
-            "chainId": CHAIN_ID, "type": 2,
+            "chainId": self._chain_id, "type": 2,
         })
         signed = self.account.sign_transaction(tx)
         tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
@@ -524,7 +526,11 @@ class SoulChainEngine:
         return None
 
     def revoke_access(self, reader: str, doc_type: int) -> Optional[str]:
-        """Revoke read access from an address for a doc type."""
+        """Revoke read access from an address for a doc type.
+        
+        Note: The contract now deletes accessKeys on revokeAccess.
+        If using an older contract version, call removeAccessKey separately.
+        """
         if not self.is_registered():
             logger.error("Soul not registered")
             return None
@@ -537,13 +543,13 @@ class SoulChainEngine:
             "from": self.account.address,
             "nonce": nonce, "gas": 100000,
             "maxFeePerGas": max_fee, "maxPriorityFeePerGas": priority_fee,
-            "chainId": CHAIN_ID, "type": 2,
+            "chainId": self._chain_id, "type": 2,
         })
         signed = self.account.sign_transaction(tx)
         tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
         receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
         if receipt["status"] == 1:
-            logger.info(f"✅ Access revoked: {reader} for doc type {doc_type}")
+            logger.info(f"✅ Access revoked (incl. access key) for {reader} doc type {doc_type}")
             return tx_hash.hex()
         logger.error("Access revoke failed")
         return None
@@ -582,7 +588,7 @@ class SoulChainEngine:
             "from": self.account.address,
             "nonce": nonce, "gas": 100000,
             "maxFeePerGas": max_fee, "maxPriorityFeePerGas": priority_fee,
-            "chainId": CHAIN_ID, "type": 2,
+            "chainId": self._chain_id, "type": 2,
         })
         signed = self.account.sign_transaction(tx)
         tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
@@ -641,18 +647,20 @@ def load_config(config_path: str = None) -> dict:
 
 
 def load_private_key() -> str:
-    """Load private key from env or wallet file."""
+    """Load private key from env or keystore."""
     # 1. Direct env var
     key = os.environ.get("SOULCHAIN_PRIVATE_KEY")
     if key:
         return key
 
-    # 2. Sandbox wallet file
-    wallet_env = Path("/root/.chancy/secrets/sandbox-wallet.env")
-    if wallet_env.exists():
-        for line in wallet_env.read_text().splitlines():
-            if "PRIVATE_KEY" in line and "=" in line and not line.startswith("#"):
-                return line.split("=", 1)[1].strip()
+    # 2. Wallet file via env var
+    wallet_file = os.environ.get("SOULCHAIN_PRIVATE_KEY_FILE")
+    if wallet_file:
+        wallet_path = Path(wallet_file)
+        if wallet_path.exists():
+            for line in wallet_path.read_text().splitlines():
+                if "PRIVATE_KEY" in line and "=" in line and not line.startswith("#"):
+                    return line.split("=", 1)[1].strip()
 
     # 3. SoulChain keystore
     keystore_path = Path(os.environ.get(
@@ -668,6 +676,6 @@ def load_private_key() -> str:
         return Account.decrypt(keystore, password).hex()
 
     raise RuntimeError(
-        "No private key found. Set SOULCHAIN_PRIVATE_KEY, use sandbox wallet, "
-        "or configure a keystore."
+        "No private key found. Set SOULCHAIN_PRIVATE_KEY or "
+        "SOULCHAIN_PRIVATE_KEY_FILE, or configure a keystore."
     )

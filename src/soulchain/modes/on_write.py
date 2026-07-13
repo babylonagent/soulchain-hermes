@@ -33,6 +33,7 @@ class SoulChainHandler(FileSystemEventHandler):
         self.debounce_ms = config.get("debounceMs", 2000)
         self._timers: dict[str, threading.Timer] = {}
         self._lock = threading.Lock()
+        self._anchor_lock = threading.Lock()  # serializes anchor txs (nonce safety)
         self._shutdown = False
 
         # Build reverse lookup: absolute path → (doc_type, name)
@@ -92,7 +93,8 @@ class SoulChainHandler(FileSystemEventHandler):
 
         logger.info(f"📝 {name} changed — anchoring...")
         try:
-            tx_hash = self.engine.anchor_file(abs_path, doc_type)
+            with self._anchor_lock:  # serialize anchor calls (nonce safety)
+                tx_hash = self.engine.anchor_file(abs_path, doc_type)
             if tx_hash:
                 logger.info(f"✅ {name} anchored: {tx_hash[:16]}...")
             else:

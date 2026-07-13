@@ -1,6 +1,6 @@
 [project]
 name = "soulchain-hermes"
-version = "0.3.0"
+version = "0.3.1"
 description = "SoulChain for Hermes Agent — Sovereign AI memory, anchored on Base"
 readme = "README.md"
 license = { text = "MIT" }
