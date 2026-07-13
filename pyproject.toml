@@ -1,19 +1,47 @@
 [project]
 name = "soulchain-hermes"
-version = "0.2.0"
+version = "0.3.0"
 description = "SoulChain for Hermes Agent — Sovereign AI memory, anchored on Base"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
+authors = [
+    { name = "Babylon Agent", email = "hello@babylon-agent.com" },
+]
+keywords = ["soulchain", "hermes", "ai", "agent", "base", "onchain", "identity", "memory", "evm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Security :: Cryptography",
+]
 dependencies = [
     "web3>=7.0",
     "eth-account>=0.11",
     "watchdog>=3.0",
-    "py-solc-x>=2.0",
     "cryptography>=42.0",
     "pynacl>=1.5",
     "requests>=2.28",
 ]
+
+[project.optional-dependencies]
+deploy = [
+    "py-solc-x>=2.0",
+]
+dev = [
+    "py-solc-x>=2.0",
+    "build>=1.0",
+    "twine>=4.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/babylonagent/soulchain-hermes"
+Repository = "https://github.com/babylonagent/soulchain-hermes"
+Documentation = "https://github.com/babylonagent/soulchain-hermes#readme"
+"Bug Tracker" = "https://github.com/babylonagent/soulchain-hermes/issues"
 
 [project.scripts]
 soulchain = "soulchain.cli:main"
@@ -26,4 +54,4 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-soulchain = ["../../contracts/artifacts/*.json"]
+soulchain = ["py.typed"]
