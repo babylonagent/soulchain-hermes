@@ -92,15 +92,24 @@ class SoulChainHandler(FileSystemEventHandler):
             self._timers.pop(abs_path, None)
 
         logger.info(f"📝 {name} changed — anchoring...")
-        try:
-            with self._anchor_lock:  # serialize anchor calls (nonce safety)
-                tx_hash = self.engine.anchor_file(abs_path, doc_type)
-            if tx_hash:
-                logger.info(f"✅ {name} anchored: {tx_hash[:16]}...")
-            else:
-                logger.info(f"⏭️  {name}: no change or skipped")
-        except Exception as e:
-            logger.error(f"❌ {name} anchor failed: {e}")
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
+            try:
+                with self._anchor_lock:  # serialize anchor calls (nonce safety)
+                    tx_hash = self.engine.anchor_file(abs_path, doc_type)
+                if tx_hash:
+                    logger.info(f"✅ {name} anchored: {tx_hash[:16]}...")
+                    break
+                else:
+                    logger.info(f"⏭️  {name}: no change or skipped")
+                    break
+            except Exception as e:
+                if attempt < max_attempts:
+                    wait = 2 ** (attempt - 1)  # 1s, 2s, 4s
+                    logger.warning(f"⚠️  {name} anchor attempt {attempt}/{max_attempts} failed: {e} — retrying in {wait}s")
+                    time.sleep(wait)
+                else:
+                    logger.error(f"❌ {name} anchor failed after {max_attempts} attempts: {e}")
 
     def flush(self):
         """Wait for pending debounced anchors to complete."""

@@ -117,8 +117,14 @@ contract SoulRegistry {
         return documents[agent][docType][version];
     }
 
-    /// @notice Get total versions for a document type
+    /// @notice Get total versions for a document type (owner, granted readers, or parent only)
     function documentCount(address agent, uint8 docType) external view returns (uint32) {
+        require(
+            msg.sender == agent ||
+            accessGrants[agent][msg.sender][docType] ||
+            parent[agent] == msg.sender,
+            "Access denied"
+        );
         return uint32(documents[agent][docType].length);
     }
 
@@ -169,13 +175,21 @@ contract SoulRegistry {
         emit ChildRegistered(msg.sender, child);
     }
 
-    /// @notice Get children of an agent
+    /// @notice Get children of an agent (self or parent only)
     function getChildren(address agent) external view returns (address[] memory) {
+        require(
+            msg.sender == agent || parent[agent] == msg.sender,
+            "Access denied"
+        );
         return children[agent];
     }
 
-    /// @notice Get parent of an agent
+    /// @notice Get parent of an agent (self or parent only)
     function getParent(address agent) external view returns (address) {
+        require(
+            msg.sender == agent || parent[agent] == msg.sender,
+            "Access denied"
+        );
         return parent[agent];
     }
 
