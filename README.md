@@ -6,15 +6,17 @@
 
 ## What is this?
 
-SoulChain anchors your Hermes Agent's identity and memory onto the Base blockchain. Every tracked file (SOUL.md, MEMORY.md, USER.md) gets a tamper-proof cryptographic record on-chain. You can verify nothing was silently altered, and restore from any point in history.
+SoulChain anchors your Hermes Agent's identity and memory onto any EVM chain. Every tracked file (SOUL.md, MEMORY.md, USER.md) gets a tamper-proof cryptographic record on-chain. You can verify nothing was silently altered, and restore from any point in history.
 
 When a VPS dies, a disk corrupts, or a provider shuts down — the agent's soul survives.
+
+**Chain-agnostic by design.** Works on Base, Arbitrum, Optimism, Polygon, Ethereum, or any EVM network. Babylon Agent's deployment runs on Base L2, but you can deploy your own SoulRegistry contract anywhere in one command.
 
 ## Status: Phase 4 — ✅ PyPI Published
 
 | Component | Status |
 |---|---|
-| SoulRegistry.sol on Base | ✅ Deployed & registered |
+| SoulRegistry.sol | ✅ Deployed on Base (deploy your own on any chain) |
 | `on-write` daemon | ✅ Watchdog file watcher — anchors within 2s of change |
 | `interval` daemon | ✅ Periodic batch sync — configurable interval |
 | `manual` CLI | ✅ On-demand anchor, status, verify |
@@ -27,7 +29,7 @@ When a VPS dies, a disk corrupts, or a provider shuts down — the agent's soul 
 
 ### Proven test results
 
-All three sync modes verified with real on-chain transactions on Base mainnet:
+All three sync modes verified with real on-chain transactions on Base mainnet (works on any EVM chain):
 
 | Mode | Test | Result |
 |---|---|---|
@@ -81,7 +83,7 @@ Uses `watchdog` to monitor tracked files. When a file changes:
 1. Debounces for 2 seconds (waits for writes to settle)
 2. SHA-256 hashes the new content
 3. Signs with EIP-191
-4. Anchors on Base via `writeDocument()`
+4. Anchors on-chain via `writeDocument()`
 
 **Best for:** Always-on agents that need every memory change immortalized.
 

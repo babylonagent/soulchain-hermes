@@ -45,7 +45,7 @@ export SOULCHAIN_PRIVATE_KEY_FILE=/path/to/wallet.env
 soulchain register
 ```
 
-This calls `registerSoul()` on the SoulRegistry contract — your identity is now on Base.
+This calls `registerSoul()` on the SoulRegistry contract — your identity is now on-chain.
 
 ### 4. Start anchoring
 
