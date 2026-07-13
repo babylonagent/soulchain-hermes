@@ -52,6 +52,12 @@ class SoulChainHandler(FileSystemEventHandler):
             return
         self._handle_change(event.src_path)
 
+    def on_moved(self, event):
+        """Handle atomic writes (temp file → rename) used by Hermes."""
+        if event.is_directory or self._shutdown:
+            return
+        self._handle_change(event.dest_path)
+
     def _handle_change(self, filepath: str):
         """Debounce file changes, then anchor."""
         abs_path = str(Path(filepath).resolve())
